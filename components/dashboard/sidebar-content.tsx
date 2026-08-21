@@ -1,9 +1,23 @@
 'use client';
 
-import { LogOut, Sparkles } from 'lucide-react';
+import {
+  ChevronsUpDown,
+  CreditCard,
+  LogOut,
+  Settings,
+  Shield,
+  Sparkles,
+} from 'lucide-react';
 import Link from 'next/link';
 
-import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { signOutAction } from '@/lib/auth-actions';
 
 import { NAV_ACCOUNT, NAV_PRIMARY } from './nav-items';
@@ -42,26 +56,118 @@ export function SidebarContent({
         </div>
       </nav>
 
-      <div className="border-t p-3">
-        <div className="flex items-center gap-3 rounded-md px-2 py-2">
-          <Avatar name={user.name ?? user.email ?? '?'} />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium">{user.name ?? 'Account'}</p>
-            <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-          </div>
-          {user.plan ? (
-            <span className="rounded-full border bg-card px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {user.plan}
-            </span>
-          ) : null}
-        </div>
-        <form action={signOutAction} className="mt-1">
-          <Button type="submit" variant="ghost" size="sm" className="w-full justify-start text-muted-foreground">
-            <LogOut className="h-4 w-4" /> Sign out
-          </Button>
-        </form>
+      <div className="border-t p-2">
+        <AccountMenu user={user} onNavigate={onNavigate} />
       </div>
     </div>
+  );
+}
+
+function AccountMenu({
+  user,
+  onNavigate,
+}: {
+  user: { name?: string | null; email?: string | null; plan?: string | null };
+  onNavigate?: () => void;
+}) {
+  const displayName = user.name ?? user.email ?? 'Account';
+  const email = user.email ?? '';
+  const plan = (user.plan ?? 'free').toLowerCase();
+  const isFree = plan === 'free';
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="group flex w-full items-center gap-2.5 rounded-md p-2 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+          aria-label="Open account menu"
+        >
+          <Avatar name={displayName} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium leading-tight">{displayName}</p>
+            {email && (
+              <p className="truncate text-xs leading-tight text-muted-foreground">
+                {email}
+              </p>
+            )}
+          </div>
+          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-70 group-hover:opacity-100" />
+        </button>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent
+        side="top"
+        align="start"
+        sideOffset={8}
+        className="w-64"
+      >
+        <div className="flex items-start gap-2.5 px-2 py-2.5">
+          <Avatar name={displayName} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium leading-tight">{displayName}</p>
+            {email && (
+              <p className="truncate text-xs leading-tight text-muted-foreground">
+                {email}
+              </p>
+            )}
+            <PlanBadge plan={plan} className="mt-1.5" />
+          </div>
+        </div>
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuLabel>Account</DropdownMenuLabel>
+        <DropdownMenuItem asChild>
+          <Link href="/account/profile" onClick={onNavigate}>
+            <Settings className="h-4 w-4 text-muted-foreground" />
+            Profile
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/account/sessions" onClick={onNavigate}>
+            <Shield className="h-4 w-4 text-muted-foreground" />
+            Sessions & security
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/account/usage" onClick={onNavigate}>
+            <CreditCard className="h-4 w-4 text-muted-foreground" />
+            {isFree ? 'Upgrade plan' : 'Usage & billing'}
+          </Link>
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuItem asChild className="text-destructive focus:text-destructive">
+          <form action={signOutAction}>
+            <button
+              type="submit"
+              className="flex w-full items-center gap-2 text-left"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </button>
+          </form>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function PlanBadge({ plan, className }: { plan: string; className?: string }) {
+  const label = plan.toUpperCase();
+  const styles: Record<string, string> = {
+    free: 'bg-secondary text-secondary-foreground',
+    starter: 'bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-200',
+    pro: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
+  };
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${styles[plan] ?? styles.free} ${className ?? ''}`}
+    >
+      {label}
+    </span>
   );
 }
 
