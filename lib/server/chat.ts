@@ -29,6 +29,13 @@ export type RagChatInput = {
   systemPrompt: string;
   message: string;
   history?: ChatTurn[];
+  /**
+   * Optional "About this returning visitor" block from cross-session memory
+   * recall (see `lib/server/memory.ts`). Prepended to the system prompt
+   * before the RAG context so the model sees who it's talking to before it
+   * sees what the docs say. Omit for new visitors.
+   */
+  memoryBlock?: string | null;
 };
 
 export type RagChatResult = {
@@ -51,12 +58,12 @@ let cachedModel: string | null = null;
 
 export function _setChatClient(impl: ChatClient | null) {
   cachedClient = impl;
-  // Tests don't care about the model name; default it so getProviderClient
+  // Tests don't care about the model name; default it so getChatClient
   // short-circuits past the env-required-key check.
   cachedModel = impl ? 'test-model' : null;
 }
 
-function getProviderClient(): { client: ChatClient; model: string } {
+export function getChatClient(): { client: ChatClient; model: string } {
   if (cachedClient && cachedModel) return { client: cachedClient, model: cachedModel };
 
   const provider = env.CHAT_PROVIDER;
@@ -205,8 +212,8 @@ export async function ragChat(input: RagChatInput): Promise<RagChatResult> {
     };
   }
 
-  const system = buildSystemPrompt(input.systemPrompt, retrieved);
-  const { client, model } = getProviderClient();
+  const system = buildSystemPrompt(input.systemPrompt, retrieved, input.memoryBlock ?? null);
+  const { client, model } = getChatClient();
   const stream = client.stream({
     model,
     system,
@@ -224,20 +231,29 @@ export async function ragChat(input: RagChatInput): Promise<RagChatResult> {
   };
 }
 
-function buildSystemPrompt(userSystem: string, retrieved: RetrievedChunk[]): string {
+function buildSystemPrompt(
+  userSystem: string,
+  retrieved: RetrievedChunk[],
+  memoryBlock: string | null,
+): string {
   const contextBlock = retrieved
     .map((r, i) => `[${i + 1}] (from "${r.document.title}")\n${r.chunk.content.trim()}`)
     .join('\n\n---\n\n');
 
-  return [
+  const parts = [
     userSystem.trim(),
     '',
     'Use ONLY the context below to answer. If the answer is not in the context, say you don\'t know — do NOT invent facts.',
     'Cite sources inline as [1], [2], etc., matching the numbered chunks. Keep citations next to the claim they support.',
-    '',
-    'Context:',
-    contextBlock,
-  ].join('\n');
+  ];
+
+  if (memoryBlock) {
+    parts.push('', memoryBlock);
+  }
+
+  parts.push('', 'Context:', contextBlock);
+
+  return parts.join('\n');
 }
 
 async function* yieldOnce(s: string): AsyncIterable<string> {

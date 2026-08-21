@@ -10,8 +10,12 @@ import {
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 
+import { and, desc, eq } from 'drizzle-orm';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { db } from '@/db';
+import { endUsers, observations } from '@/db/schema';
 import { getBotForUser } from '@/lib/server/bots';
 import { getConversationDetail } from '@/lib/server/conversations';
 import { parseUserAgent } from '@/lib/server/parse-ua';
@@ -20,6 +24,7 @@ import { requireAuth } from '@/lib/server/require-auth';
 import { ConversationActions } from './conversation-actions';
 import { DeleteConversationButton } from './delete-conversation-button';
 import { MessageBubble } from './message-bubble';
+import { UserMemoryPanel } from './user-memory-panel';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +48,27 @@ export default async function ConversationDetailPage({
   const { conversation, messages } = detail;
   const ua = parseUserAgent(conversation.userAgent);
   const duration = computeDuration(conversation.createdAt, conversation.lastMessageAt);
+
+  // Load the visitor's cross-session memory. Only populated when the same
+  // endUserId has spoken with this bot before (see lib/server/memory.ts).
+  // Anonymous / brand-new-cookie visitors: endUser is null → panel renders empty state.
+  const endUser = conversation.endUserId
+    ? await db.query.endUsers.findFirst({
+        where: and(eq(endUsers.botId, bot.id), eq(endUsers.endUserId, conversation.endUserId)),
+      })
+    : null;
+  const memoryObservations = endUser
+    ? await db
+        .select({
+          id: observations.id,
+          content: observations.content,
+          createdAt: observations.createdAt,
+        })
+        .from(observations)
+        .where(eq(observations.endUserRefId, endUser.id))
+        .orderBy(desc(observations.createdAt))
+        .limit(50)
+    : [];
 
   // Walk the transcript and map every assistant message to its immediately
   // preceding user message so the "Add to training" button can pre-fill both
@@ -153,6 +179,22 @@ export default async function ConversationDetailPage({
               ) : null}
             </CardContent>
           </Card>
+
+          <UserMemoryPanel
+            botId={bot.id}
+            endUserRefId={endUser?.id ?? null}
+            endUserProfile={
+              endUser
+                ? {
+                    name: endUser.name,
+                    email: endUser.email,
+                    phone: endUser.phone,
+                    tags: endUser.tags,
+                  }
+                : null
+            }
+            observations={memoryObservations}
+          />
         </aside>
       </div>
     </div>

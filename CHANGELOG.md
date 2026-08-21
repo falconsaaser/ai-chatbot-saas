@@ -6,7 +6,50 @@ All notable changes to this project are documented in this file. Format follows
 
 ## [Unreleased]
 
-_No unreleased changes yet._
+### Added
+- **Cross-session per-user memory** — same-visitor observations recalled across conversations.
+    - Schema: two new tables (migration 0007).
+        - `end_user` — one row per (bot, endUserId). Nullable profile fields
+          (`name`, `email`, `phone`) + `tags[]` for admin segmentation.
+          Unique index on `(botId, endUserId)`.
+        - `observation` — extracted facts embedded with the same 1536-dim
+          `vector` column shape as `chunk`, HNSW cosine index. `sourceMessageId`
+          FK to `message` (SET NULL on delete) provides an audit trail so
+          admins can trace any observation back to the exchange that produced it.
+    - `lib/server/memory.ts` — pure helpers:
+        - `upsertEndUser(botId, endUserId)` — get-or-create; select-first hot
+          path (skips row locks on returning visitors), `onConflictDoUpdate`
+          fallback for the cold path.
+        - `recallObservations(botId, endUserId, query)` — top-K semantic
+          (pgvector `<=>` cosine) + N most-recent, deduped by id, empty for
+          new visitors (no memory block prepended, zero overhead).
+        - `extractObservations(userMessage, assistantMessage)` — cheap LLM
+          call with a durable-facts-only system prompt, `AbortController`
+          hard-capped at 6s, greetings/thanks skipped before the call, JSON
+          parsed robustly (handles fenced code blocks), 5-fact cap and
+          6-300 char length filter to keep prompts bounded.
+        - `persistObservations(...)` — embed + bulk insert, never throws.
+        - `renderMemoryBlock(items)` — formats the *About this returning
+          visitor* block or returns `null` when empty.
+    - `lib/server/chat.ts` — `ragChat` now accepts an optional `memoryBlock`
+      which is prepended to the system prompt after the user's persona but
+      before the RAG context, so the model sees who it's talking to before
+      it sees what the docs say. `getChatClient` promoted from internal to
+      exported for the extractor to reuse.
+    - `lib/server/chat-pipeline.ts` — recall runs before every LLM call;
+      extract-and-persist fires after the assistant reply and is void'd so
+      extraction latency **never** lands in the user's response path.
+    - **Admin UI**: new *User memory* panel on the conversation detail page
+      (`bots/[id]/conversations/[cid]`) — renders profile fields, tag chips,
+      and every stored observation with per-row delete (privacy / GDPR).
+      DELETE route at `/api/bots/[id]/end-users/[endUserRefId]/observations/[obsId]`
+      enforces bot ownership + endUser scoping.
+    - 10 unit tests for pure helpers (`renderMemoryBlock`, `parseFactsResponse`)
+      + 4 integration tests (gated on `RUN_INTEGRATION_TESTS=1`) covering the
+      new-visitor empty state, the extract→persist→recall round-trip, greeting
+      filtering, and `upsertEndUser` idempotency.
+    - README highlight row + full *Remember returning visitors* section
+      explaining the mechanics.
 
 ## [1.0.0] - 2026-06-20
 

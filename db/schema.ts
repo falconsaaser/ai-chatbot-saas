@@ -23,6 +23,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
   varchar,
   vector,
@@ -287,6 +288,71 @@ export const messages = pgTable(
 );
 
 // -----------------------------------------------------------------------------
+// End-user memory — per-visitor semantic recall across conversations.
+//
+// `endUsers` is one row per (bot, endUserId) — the same visitor identity
+// already threaded through the pipeline for cookie/telegram/whatsapp channels.
+// Profile fields are opportunistic: nullable, filled by admin edits or by
+// extractor prompts if the caller opts in later.
+//
+// `observations` stores durable facts extracted from prior turns, embedded so
+// the chat pipeline can pull the most-similar-to-current-query subset before
+// generation. This is the missing piece that turns per-session RAG into
+// cross-session per-user recall.
+// -----------------------------------------------------------------------------
+
+export const endUsers = pgTable(
+  'end_user',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    botId: uuid('botId')
+      .notNull()
+      .references(() => bots.id, { onDelete: 'cascade' }),
+    /** Stable per-visitor identity: cookie value (web), `tg:{ch}:{chat}`, `wa:{ch}:{phone}`. */
+    endUserId: varchar('endUserId', { length: 128 }).notNull(),
+    /** Optional profile fields — nullable, admin- or widget-provided. */
+    name: text('name'),
+    email: varchar('email', { length: 254 }),
+    phone: varchar('phone', { length: 32 }),
+    /** Free-form admin tags for segmentation. */
+    tags: jsonb('tags').$type<string[]>().notNull().default([]),
+    createdAt: timestamp('createdAt', { mode: 'date' }).notNull().defaultNow(),
+    updatedAt: timestamp('updatedAt', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => ({
+    botEndUserUniq: uniqueIndex('end_user_bot_end_user_uniq').on(t.botId, t.endUserId),
+  }),
+);
+
+export const observations = pgTable(
+  'observation',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    endUserRefId: uuid('endUserRefId')
+      .notNull()
+      .references(() => endUsers.id, { onDelete: 'cascade' }),
+    /** Denormalised for fast per-bot filtering without a join. */
+    botId: uuid('botId')
+      .notNull()
+      .references(() => bots.id, { onDelete: 'cascade' }),
+    content: text('content').notNull(),
+    embedding: vector('embedding', { dimensions: EMBEDDING_DIMENSIONS }),
+    /** Which assistant message this observation was extracted from (audit trail + admin delete). */
+    sourceMessageId: uuid('sourceMessageId').references(() => messages.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: timestamp('createdAt', { mode: 'date' }).notNull().defaultNow(),
+  },
+  (t) => ({
+    endUserIdx: index('observation_end_user_idx').on(t.endUserRefId, t.createdAt),
+    botIdx: index('observation_bot_idx').on(t.botId),
+    embeddingIdx: index('observation_embedding_idx')
+      .using('hnsw', t.embedding.op('vector_cosine_ops'))
+      .where(sql`${t.embedding} IS NOT NULL`),
+  }),
+);
+
+// -----------------------------------------------------------------------------
 // Channels — each bot can be exposed via N channels (embed widget, Telegram,
 // WhatsApp). Adding more (Slack, Discord) is a new `type` value + webhook route.
 // -----------------------------------------------------------------------------
@@ -327,3 +393,5 @@ export type Document = typeof documents.$inferSelect;
 export type Chunk = typeof chunks.$inferSelect;
 export type Conversation = typeof conversations.$inferSelect;
 export type Message = typeof messages.$inferSelect;
+export type EndUser = typeof endUsers.$inferSelect;
+export type Observation = typeof observations.$inferSelect;

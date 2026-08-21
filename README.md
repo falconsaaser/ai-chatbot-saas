@@ -84,6 +84,7 @@
 | 🧠 | **5 LLM providers** — OpenAI · Claude · Gemini · Deepseek · Ollama (set with one env var) |
 | 📚 | **9 source types** — PDF · DOCX · XLSX · JSON · Markdown · TXT · URLs · sitemap.xml crawl · Q&A pairs |
 | 🌐 | **3 channels** — Embed widget (3.2 KB Shadow-DOM) · Telegram (private + groups) · WhatsApp Cloud API |
+| 🧬 | **Cross-session per-user memory** — same-visitor observations recalled across conversations, pgvector-native, no external service |
 | 💬 | **Conversation admin** — search, filter, flag, bulk delete, JSON export across every channel |
 | 🎓 | **Promote-to-training** — one click turns any good customer Q&A into a permanent training source |
 | 🔐 | **Multi-tenant isolation** — server-side enforced, adversarially tested |
@@ -123,6 +124,14 @@
 - Live stats: active 24h, active 7d, unique end-users, avg messages per session
 - Flag: `review` / `star` / `abuse` / `spam`
 - **Add to training** on any assistant message → editable, idempotent, reversible
+
+### Remember returning visitors (cross-session per-user memory)
+- Same `endUserId` across sessions (cookie · Telegram chat · WhatsApp phone) — one profile row per (bot, visitor)
+- After each turn, an **extractor** call distills 0–5 durable facts from the exchange and stores them as **embedded observations** (pgvector, HNSW cosine index)
+- On the next turn, **recall** pulls **top-K by similarity + N most-recent** and prepends an *About this returning visitor* block to the system prompt — no query-time LLM call, no external service
+- Admin sees the memory on the conversation detail page: profile fields, tag list, and every stored observation with per-row delete (privacy / GDPR)
+- Empty-state for new visitors: no block prepended, **zero overhead**
+- Write path is fire-and-forget so extraction latency never lands in the user's response time
 
 ### Admin security
 - Per-device login list (`/account/sessions`) with revoke + **"Sign out everywhere else"**
