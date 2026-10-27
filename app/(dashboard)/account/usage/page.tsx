@@ -161,7 +161,7 @@ const price = prices[plan];
     {price.monthly} €<span className="text-sm font-normal text-muted-foreground">/mois</span>
   </p>
   <p className="mt-1 text-xs text-muted-foreground">
-    + {price.setup} € de frais d'installation (une seule fois)
+    + {price.setup} € de frais d&apos;installation (une seule fois)
   </p>
   <p className="mt-2 text-xs text-muted-foreground">{tagline}</p>
 </div>
