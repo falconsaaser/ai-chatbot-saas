@@ -65,3 +65,4 @@ export const styles = (accent: string) => `
   .ai-footer a { color: #6b7280; text-decoration: none; }
   .ai-footer a:hover { text-decoration: underline; }
 `;
+

@@ -9,11 +9,12 @@ import {
   getOrCreateCustomer,
   getStripe,
   isBillingConfigured,
-  priceForPlan,
+    priceForPlan,
+  setupPriceForPlan,
   type PaidPlan,
 } from '@/lib/server/stripe';
 
-const Input = z.object({ plan: z.enum(['starter', 'pro']) });
+const Input = z.object({ plan: z.enum(['starter', 'business', 'premium']) });
 
 export async function startCheckoutAction(formData: FormData) {
   const user = await requireAuth();
@@ -22,8 +23,15 @@ export async function startCheckoutAction(formData: FormData) {
   if (!isBillingConfigured()) throw new Error('Billing is not configured');
 
   const price = priceForPlan(parsed.plan as PaidPlan);
-  if (!price) throw new Error(`No Stripe price configured for the ${parsed.plan} plan`);
+  const setupPrice = setupPriceForPlan(parsed.plan as PaidPlan);
 
+  if (!price) {
+  throw new Error(`No monthly price configured for the ${parsed.plan} plan`);
+}
+
+if (!setupPrice) {
+  throw new Error(`No setup price configured for the ${parsed.plan} plan`);
+}
   const customerId = await getOrCreateCustomer({
     userId: user.id,
     email: user.email,
@@ -35,7 +43,13 @@ export async function startCheckoutAction(formData: FormData) {
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     customer: customerId,
-    line_items: [{ price, quantity: 1 }],
+    line_items: [
+  { price: price, quantity: 1 },
+  { price: setupPrice, quantity: 1 },
+],
+subscription_data: {
+  trial_period_days: 30,
+},
     success_url: `${baseUrl}/account/usage?checkout=success`,
     cancel_url: `${baseUrl}/account/usage?checkout=cancelled`,
     allow_promotion_codes: true,

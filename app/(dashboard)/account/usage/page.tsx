@@ -88,31 +88,36 @@ function BillingCard({ currentPlan }: { currentPlan: Plan }) {
       <CardHeader>
         <CardTitle>Plan &amp; billing</CardTitle>
         <CardDescription>
-          {currentPlan === 'free'
-            ? "You're on the free plan. Upgrade for higher caps."
-            : 'Manage your subscription in the Stripe customer portal.'}
+          {currentPlan === 'none' || currentPlan === 'free'
+  ? 'Choose a subscription to activate your AI chatbots.'
+  : 'Manage your subscription in the Stripe customer portal.'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        {currentPlan !== 'free' ? (
+        {currentPlan !== 'free' && currentPlan !== 'none' ? (
           <form action={openCustomerPortalAction}>
             <Button type="submit" variant="outline">
               Manage billing
             </Button>
           </form>
         ) : null}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <PlanOption
-            plan="starter"
-            currentPlan={currentPlan}
-            tagline="20 bots · 500 docs · 5k msgs/mo"
-          />
-          <PlanOption
-            plan="pro"
-            currentPlan={currentPlan}
-            tagline="200 bots · 5k docs · 50k msgs/mo"
-          />
-        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+  <PlanOption
+    plan="starter"
+    currentPlan={currentPlan}
+    tagline="1 500 messages/mois"
+  />
+  <PlanOption
+    plan="business"
+    currentPlan={currentPlan}
+    tagline="4 500 messages/mois"
+  />
+  <PlanOption
+    plan="premium"
+    currentPlan={currentPlan}
+    tagline="10 000 messages/mois"
+  />
+</div>
       </CardContent>
     </Card>
   );
@@ -123,17 +128,24 @@ function PlanOption({
   currentPlan,
   tagline,
 }: {
-  plan: 'starter' | 'pro';
+  plan: 'starter' | 'business' | 'premium';
   currentPlan: Plan;
   tagline: string;
 }) {
   const limits = PLAN_LIMITS[plan];
   const isCurrent = currentPlan === plan;
+  const prices = {
+  starter: { setup: 119, monthly: 39 },
+  business: { setup: 179, monthly: 59 },
+  premium: { setup: 279, monthly: 89 },
+};
+
+const price = prices[plan];
   return (
-    <div className={`flex flex-col rounded-lg border bg-card p-5 shadow-soft ${plan === 'pro' ? 'border-brand/40' : ''}`}>
+    <div className={`flex flex-col rounded-lg border bg-card p-5 shadow-soft ${plan === 'business' ? 'border-brand/40' : ''}`}>
       <div className="flex items-center justify-between">
         <h3 className="font-semibold capitalize">{plan}</h3>
-        {plan === 'pro' ? (
+        {plan === 'business' ? (
           <span className="rounded-full border border-brand/40 bg-brand/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-brand">
             Recommended
           </span>
@@ -144,7 +156,15 @@ function PlanOption({
           </span>
         ) : null}
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">{tagline}</p>
+      <div className="mt-3">
+  <p className="text-2xl font-bold">
+    {price.monthly} €<span className="text-sm font-normal text-muted-foreground">/mois</span>
+  </p>
+  <p className="mt-1 text-xs text-muted-foreground">
+    + {price.setup} € de frais d'installation (une seule fois)
+  </p>
+  <p className="mt-2 text-xs text-muted-foreground">{tagline}</p>
+</div>
       <ul className="mt-4 space-y-1.5 text-xs text-muted-foreground">
         <li>· {limits.bots.toLocaleString()} chatbots</li>
         <li>· {limits.documents.toLocaleString()} documents</li>
@@ -156,7 +176,7 @@ function PlanOption({
         <Button
           type="submit"
           disabled={isCurrent}
-          variant={plan === 'pro' ? 'brand' : 'default'}
+          variant={plan === 'business' ? 'brand' : 'default'}
           className="w-full"
         >
           {isCurrent ? 'Current plan' : `Upgrade to ${plan}`}

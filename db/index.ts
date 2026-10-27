@@ -14,7 +14,11 @@ import * as schema from './schema';
 // `prepare: false` is required when running on serverless platforms that may
 // reuse connections across requests with different schemas. Safe to leave on
 // for self-hosted too.
-const client = postgres(env.DATABASE_URL, { prepare: false, max: 10 });
+const client = postgres(env.DATABASE_URL, {
+  prepare: false,
+  max: 3,
+  idle_timeout: 20,
+});
 
 export const db = drizzle(client, { schema });
 export type DB = typeof db;

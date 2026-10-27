@@ -30,7 +30,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import type { AdapterAccountType } from 'next-auth/adapters';
 
-export const planEnum = pgEnum('plan', ['free', 'starter', 'pro']);
+export const planEnum = pgEnum('plan', ['none', 'free', 'starter', 'pro', 'business', 'premium']);
 
 // -----------------------------------------------------------------------------
 // Auth.js v5 tables — names/columns fixed by @auth/drizzle-adapter
@@ -45,7 +45,7 @@ export const users = pgTable('user', {
   emailVerified: timestamp('emailVerified', { mode: 'date' }),
   image: text('image'),
   hashedPassword: text('hashedPassword'),
-  plan: planEnum('plan').notNull().default('free'),
+  plan: planEnum('plan').notNull().default('none'),
   planChangedAt: timestamp('planChangedAt', { mode: 'date' }).notNull().defaultNow(),
   stripeCustomerId: text('stripeCustomerId'),
   stripeSubscriptionId: text('stripeSubscriptionId'),

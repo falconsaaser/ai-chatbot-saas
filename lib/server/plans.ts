@@ -12,7 +12,7 @@ import { and, count, eq, gte, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { bots, conversations, documents, messages, users } from '@/db/schema';
 
-export type Plan = 'free' | 'starter' | 'pro';
+export type Plan = 'none' | 'free' | 'starter' | 'pro' | 'business' | 'premium';
 
 export type PlanLimits = {
   /** Hard cap on simultaneous chatbots. */
@@ -25,26 +25,50 @@ export type PlanLimits = {
   messagesPerMonth: number;
 };
 
+
 export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
+  none: {
+  bots: 0,
+  documents: 0,
+  documentBytes: 0,
+  messagesPerMonth: 0,
+},
   free: {
     bots: 3,
     documents: 25,
-    documentBytes: 50 * 1024 * 1024, // 50 MB
+    documentBytes: 50 * 1024 * 1024,
     messagesPerMonth: 200,
   },
+
   starter: {
-    bots: 20,
+    bots: 1,
     documents: 500,
-    documentBytes: 1 * 1024 * 1024 * 1024, // 1 GB
-    messagesPerMonth: 5_000,
+    documentBytes: 1 * 1024 * 1024 * 1024,
+    messagesPerMonth: 1_500,
   },
+
+  business: {
+    bots: 2,
+    documents: 500,
+    documentBytes: 1 * 1024 * 1024 * 1024,
+    messagesPerMonth: 4_500,
+  },
+
+  premium: {
+    bots: 3,
+    documents: 5_000,
+    documentBytes: 10 * 1024 * 1024 * 1024,
+    messagesPerMonth: 10_000,
+  },
+
   pro: {
     bots: 200,
     documents: 5_000,
-    documentBytes: 10 * 1024 * 1024 * 1024, // 10 GB
+    documentBytes: 10 * 1024 * 1024 * 1024,
     messagesPerMonth: 50_000,
   },
 };
+
 
 export type Usage = {
   bots: number;
@@ -62,8 +86,9 @@ export class QuotaExceededError extends Error {
 
 export async function getPlan(userId: string): Promise<Plan> {
   const row = await db.query.users.findFirst({ where: eq(users.id, userId) });
-  return (row?.plan ?? 'free') as Plan;
+  return (row?.plan ?? 'none') as Plan;
 }
+
 
 export function limitsFor(plan: Plan): PlanLimits {
   return PLAN_LIMITS[plan];
@@ -136,3 +161,4 @@ function monthStartUtc(): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }
+

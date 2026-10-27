@@ -13,21 +13,27 @@
  */
 import { z } from 'zod';
 
-import {
-  appendAssistantMessage,
-  appendUserMessage,
-  listMessages,
-} from '@/lib/server/conversations';
 import { ragChat, type ChatTurn } from '@/lib/server/chat';
 import { QuotaExceededError, assertCanSendMessage } from '@/lib/server/plans';
 import { rateLimit } from '@/lib/server/rate-limit';
-import { getOrCreateWidgetConversation } from '@/lib/server/conversations';
+import {
+  appendAssistantMessage,
+  appendUserMessage,
+  getOrCreateWidgetConversation,
+  listMessages,
+} from '@/lib/server/conversations';
 import {
   END_USER_COOKIE_PREFIX,
   findBotByPublicKey,
   generateEndUserId,
 } from '@/lib/server/widget';
-
+import {
+  extractObservations,
+  persistObservations,
+  recallObservations,
+  renderMemoryBlock,
+  upsertEndUser,
+} from '@/lib/server/memory';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -107,23 +113,32 @@ export async function POST(req: Request) {
     userAgent: req.headers.get('user-agent'),
     referrer: req.headers.get('referer'),
   });
+  const endUser = await upsertEndUser(bot.id, endUserId);
   const prior = await listMessages(conversation.id);
   const history: ChatTurn[] = prior
     .slice(-MAX_HISTORY_TURNS)
     .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
   await appendUserMessage(conversation.id, body.message);
+  const recalled = await recallObservations(
+  bot.id,
+  endUserId,
+  body.message,
+).catch(() => []);
+
+const memoryBlock = renderMemoryBlock(recalled);
 
   const start = Date.now();
   let ragResult: Awaited<ReturnType<typeof ragChat>>;
   try {
     ragResult = await ragChat({
-      userId: bot.userId,
-      botId: bot.id,
-      systemPrompt: bot.systemPrompt,
-      message: body.message,
-      history,
-    });
+  userId: bot.userId,
+  botId: bot.id,
+  systemPrompt: bot.systemPrompt,
+  message: body.message,
+  history,
+  memoryBlock,
+});
   } catch (error) {
     // Anything thrown synchronously by ragChat (e.g., OPENAI_API_KEY missing)
     // turns into a JSON error so the widget can surface it instead of "HTTP 500".
@@ -149,6 +164,22 @@ export async function POST(req: Request) {
           citations: citations.map((c) => ({ chunkId: c.chunkId, score: c.score })),
           latencyMs,
         });
+        void (async () => {
+  try {
+    const facts = await extractObservations(body.message, assembled);
+
+    if (facts.length > 0) {
+      await persistObservations(
+        bot.id,
+        endUser.id,
+        null,
+        facts,
+      );
+    }
+  } catch (error) {
+    console.warn('[memory] widget extraction failed:', error);
+  }
+})();
         controller.enqueue(encoder.encode(sseEvent({ type: 'citations', citations })));
         controller.enqueue(encoder.encode(sseEvent({ type: 'done', latencyMs })));
         controller.close();

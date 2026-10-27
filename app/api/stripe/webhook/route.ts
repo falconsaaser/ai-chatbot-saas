@@ -8,10 +8,15 @@
  * The raw body MUST be read as a string, not parsed JSON — Stripe's signature
  * covers the exact byte stream we received.
  */
+
 import type Stripe from 'stripe';
 
 import { env } from '@/lib/env';
-import { applySubscriptionState, getStripe, isBillingConfigured } from '@/lib/server/stripe';
+import {
+  applySubscriptionState,
+  getStripe,
+  isBillingConfigured,
+} from '@/lib/server/stripe';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,15 +25,29 @@ export async function POST(req: Request) {
   if (!isBillingConfigured()) {
     return new Response('Billing not configured', { status: 503 });
   }
+
   const signature = req.headers.get('stripe-signature');
-  if (!signature) return new Response('Missing signature', { status: 400 });
+
+  if (!signature) {
+    return new Response('Missing signature', { status: 400 });
+  }
 
   const body = await req.text();
+
   let event: Stripe.Event;
+
   try {
-    event = getStripe().webhooks.constructEvent(body, signature, env.STRIPE_WEBHOOK_SECRET!);
+    event = getStripe().webhooks.constructEvent(
+      body,
+      signature,
+      env.STRIPE_WEBHOOK_SECRET!
+    );
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'signature verification failed';
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Signature verification failed';
+
     return new Response(`Webhook Error: ${message}`, { status: 400 });
   }
 
@@ -36,20 +55,33 @@ export async function POST(req: Request) {
     case 'customer.subscription.created':
     case 'customer.subscription.updated':
     case 'customer.subscription.deleted': {
-      const sub = event.data.object as Stripe.Subscription;
-      const priceId = sub.items.data[0]?.price.id ?? null;
+      const eventSubscription = event.data.object as Stripe.Subscription;
+
+      // Toujours récupérer l'état actuel de l'abonnement.
+      const subscription =
+  event.type === 'customer.subscription.deleted'
+    ? eventSubscription
+    : await getStripe().subscriptions.retrieve(eventSubscription.id);
+
+      const priceId = subscription.items.data[0]?.price.id ?? null;
+
       await applySubscriptionState({
-        stripeCustomerId: sub.customer as string,
-        subscriptionId: sub.id,
-        status: sub.status,
+        stripeCustomerId:
+          typeof subscription.customer === 'string'
+            ? subscription.customer
+            : subscription.customer.id,
+        subscriptionId: subscription.id,
+        status: subscription.status,
         priceId,
       });
+
       break;
     }
+
     default:
-      // 200 ack for events we don't care about — Stripe stops retrying.
       break;
   }
 
   return new Response('ok', { status: 200 });
 }
+

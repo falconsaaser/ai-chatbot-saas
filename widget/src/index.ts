@@ -1,10 +1,10 @@
-/**
+﻿/**
  * AI Chatbot SaaS embed widget.
  *
- * Loaded with: `<script src="…/widget.js" data-bot-key="bot_..." defer></script>`
+ * Loaded with: `<script src="â€¦/widget.js" data-bot-key="bot_..." defer></script>`
  *
  * Everything renders inside a Shadow DOM so the host site's CSS can't bleed
- * in and our CSS can't escape. The bundle is intentionally framework-free —
+ * in and our CSS can't escape. The bundle is intentionally framework-free â€”
  * adding React for a chat panel would 10x the file size and we want this to
  * load fast.
  */
@@ -37,7 +37,7 @@ function getScriptTag(): HTMLScriptElement | null {
 function init() {
   const script = getScriptTag();
   if (!script) {
-    console.warn('[ai-chatbot] could not find the loader <script data-bot-key="…">');
+    console.warn('[ai-chatbot] could not find the loader <script data-bot-key="â€¦">');
     return;
   }
   const botKey = script.dataset.botKey || '';
@@ -50,6 +50,20 @@ function init() {
   const title = script.dataset.title || 'Ask the bot';
   const greeting = script.dataset.greeting || "Hi! Ask me anything about this site's content.";
   const accent = script.dataset.accent || '#111827';
+ const storageKey = `nexusconnect_visitor_${botKey}`;
+
+let visitorId: string;
+
+try {
+  const savedId = localStorage.getItem(storageKey);
+  visitorId = savedId || crypto.randomUUID();
+
+  if (!savedId) {
+    localStorage.setItem(storageKey, visitorId);
+  }
+} catch {
+  visitorId = crypto.randomUUID();
+}
 
   const host = document.createElement('div');
   host.setAttribute('data-aichatbot-widget', '');
@@ -76,12 +90,12 @@ function init() {
     <section class="ai-panel" role="dialog" aria-label="${escapeHtml(title)}">
       <header class="ai-header">
         <strong>${escapeHtml(title)}</strong>
-        <button class="ai-close" aria-label="Close">×</button>
+        <button class="ai-close" aria-label="Close">&times;</button>
       </header>
       <div class="ai-log" role="log" aria-live="polite"></div>
       <form class="ai-input">
-        <input type="text" placeholder="Type a question…" autocomplete="off" required maxlength="2000" />
-        <button type="submit" aria-label="Send">→</button>
+        <input type="text" placeholder="Posez votre question..." autocomplete="off" required maxlength="2000" />
+        <button type="submit" aria-label="Send">&rarr;</button>
       </form>
       <footer class="ai-footer">
         Powered by <a href="https://github.com/unusdon/ai-chatbot-saas" target="_blank" rel="noreferrer">AI Chatbot SaaS</a>
@@ -109,7 +123,7 @@ function init() {
       const bubble = document.createElement('div');
       bubble.className = `ai-msg ai-msg-${m.role}`;
       const text = document.createElement('p');
-      text.textContent = m.content || '…';
+      text.textContent = m.content || '...';
       bubble.appendChild(text);
       if (m.citations && m.citations.length) {
         const chips = document.createElement('div');
@@ -160,9 +174,13 @@ function init() {
     try {
       const res = await fetch(`${apiBase}/api/widget/chat`, {
         method: 'POST',
-        credentials: 'include',
+        credentials: 'omit',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ bot_key: botKey, message: text }),
+        body: JSON.stringify({
+  bot_key: botKey,
+  message: text,
+  end_user_id: visitorId,
+}),
       });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => null);
@@ -183,7 +201,7 @@ function init() {
       if (streamingAssistant) messages.push(streamingAssistant);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Chat failed';
-      messages.push({ role: 'assistant', content: `⚠️ ${message}` });
+      messages.push({ role: 'assistant', content: `âš ï¸ ${message}` });
     } finally {
       streamingAssistant = null;
       pending = false;
@@ -224,3 +242,4 @@ if (document.readyState === 'loading') {
 } else {
   init();
 }
+

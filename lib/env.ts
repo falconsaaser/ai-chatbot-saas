@@ -66,9 +66,14 @@ const Server = z.object({
   // Stripe — all optional. When unset, the /billing endpoints respond with a
   // "billing not configured" error so the rest of the app still boots.
   STRIPE_SECRET_KEY: z.string().optional(),
-  STRIPE_WEBHOOK_SECRET: z.string().optional(),
-  STRIPE_PRICE_STARTER: z.string().optional(),
-  STRIPE_PRICE_PRO: z.string().optional(),
+STRIPE_WEBHOOK_SECRET: z.string().optional(),
+STRIPE_PRICE_STARTER: z.string().optional(),
+STRIPE_PRICE_BUSINESS: z.string().optional(),
+STRIPE_PRICE_PREMIUM: z.string().optional(),
+STRIPE_PRICE_PRO: z.string().optional(),
+STRIPE_SETUP_PRICE_STARTER: z.string().optional(),
+STRIPE_SETUP_PRICE_BUSINESS: z.string().optional(),
+STRIPE_SETUP_PRICE_PREMIUM: z.string().optional(),
 });
 
 const Client = z.object({

@@ -40,10 +40,18 @@ export type PaidPlan = Exclude<Plan, 'free'>;
 
 export function priceForPlan(plan: PaidPlan): string | null {
   if (plan === 'starter') return env.STRIPE_PRICE_STARTER ?? null;
+  if (plan === 'business') return env.STRIPE_PRICE_BUSINESS ?? null;
+  if (plan === 'premium') return env.STRIPE_PRICE_PREMIUM ?? null;
   if (plan === 'pro') return env.STRIPE_PRICE_PRO ?? null;
   return null;
 }
 
+export function setupPriceForPlan(plan: PaidPlan): string | null {
+  if (plan === 'starter') return env.STRIPE_SETUP_PRICE_STARTER ?? null;
+  if (plan === 'business') return env.STRIPE_SETUP_PRICE_BUSINESS ?? null;
+  if (plan === 'premium') return env.STRIPE_SETUP_PRICE_PREMIUM ?? null;
+  return null;
+}
 /**
  * Look up or create a Stripe customer for this user. We persist the
  * customer id on `users.stripeCustomerId` so the second checkout doesn't
@@ -75,10 +83,17 @@ export async function getOrCreateCustomer(input: {
  * sync our `users.plan` column when a subscription event arrives.
  */
 export function planFromPriceId(priceId: string | null | undefined): Plan {
-  if (!priceId) return 'free';
-  if (priceId === env.STRIPE_PRICE_PRO) return 'pro';
-  if (priceId === env.STRIPE_PRICE_STARTER) return 'starter';
-  return 'free';
+  if (!priceId) return 'none';
+
+  if (env.STRIPE_PRICE_STARTER && priceId === env.STRIPE_PRICE_STARTER) return 'starter';
+
+  if (env.STRIPE_PRICE_BUSINESS && priceId === env.STRIPE_PRICE_BUSINESS) return 'business';
+
+  if (env.STRIPE_PRICE_PREMIUM && priceId === env.STRIPE_PRICE_PREMIUM) return 'premium';
+
+  if (env.STRIPE_PRICE_PRO && priceId === env.STRIPE_PRICE_PRO) return 'pro';
+
+  return 'none';
 }
 
 /**
@@ -98,7 +113,7 @@ export async function applySubscriptionState(args: {
 
   const plan: Plan = ['active', 'trialing', 'past_due'].includes(args.status)
     ? planFromPriceId(args.priceId)
-    : 'free';
+    : 'none';
 
   await db
     .update(users)

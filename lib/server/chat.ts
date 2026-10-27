@@ -243,9 +243,7 @@ function buildSystemPrompt(
   const parts = [
     userSystem.trim(),
     '',
-    'Use ONLY the context below to answer. If the answer is not in the context, say you don\'t know — do NOT invent facts.',
-    'Cite sources inline as [1], [2], etc., matching the numbered chunks. Keep citations next to the claim they support.',
-  ];
+    'Respond in natural, concise French by default. Answer only what the visitor asks, usually in one or two sentences. For personal details, use the conversation history and memory when available. For business facts, use the retrieved context and never invent information. Do not repeat the visitor’s name unnecessarily, speculate about their intentions, or add rhetorical questions or irrelevant comments.',]
 
   if (memoryBlock) {
     parts.push('', memoryBlock);
