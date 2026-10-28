@@ -32,7 +32,7 @@ const Server = z.object({
   // need a 1536-dim model to fit the existing pgvector column without a
   // schema change.
   CHAT_PROVIDER: z
-    .enum(['openai', 'anthropic', 'google', 'deepseek', 'ollama'])
+    .enum(['openai', 'anthropic', 'google', 'deepseek', 'ollama', 'groq'])
     .default('openai'),
   EMBEDDING_PROVIDER: z.enum(['openai', 'google', 'ollama']).default('openai'),
 
@@ -53,6 +53,9 @@ const Server = z.object({
   // Deepseek — OpenAI-compatible API, chat only
   DEEPSEEK_API_KEY: z.string().optional(),
   DEEPSEEK_CHAT_MODEL: z.string().default('deepseek-chat'),
+// Groq — OpenAI-compatible API
+GROQ_API_KEY: z.string().optional(),
+GROQ_CHAT_MODEL: z.string().default('openai/gpt-oss-20b'),
 
   // Ollama — local, OpenAI-compatible chat + embeddings. No API key needed.
   OLLAMA_BASE_URL: z.string().url().default('http://localhost:11434'),

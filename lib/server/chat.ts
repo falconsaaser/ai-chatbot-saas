@@ -84,6 +84,16 @@ export function getChatClient(): { client: ChatClient; model: string } {
       });
       model = env.DEEPSEEK_CHAT_MODEL;
       break;
+          case 'groq':
+      if (!env.GROQ_API_KEY) {
+        throw new Error('GROQ_API_KEY is required when CHAT_PROVIDER=groq');
+      }
+      client = openaiCompatClient({
+        apiKey: env.GROQ_API_KEY,
+        baseURL: 'https://api.groq.com/openai/v1',
+      });
+      model = env.GROQ_CHAT_MODEL;
+      break;
     case 'ollama':
       // Ollama exposes an OpenAI-compatible /v1/chat/completions endpoint.
       // No API key needed but the SDK requires a non-empty string.
